@@ -1,9 +1,17 @@
 import re
 from urllib.parse import urlparse
+from bs4 import BeautifulSoup
 
 def scraper(url, resp):
     links = extract_next_links(url, resp)
-    return [link for link in links if is_valid(link)]
+    visited_url = set()
+    need_to_visit = []
+    for link in links:
+        hashed = hash(link)
+        if hashed not in visited_url:
+            visited_url.add(hashed)
+            need_to_visit.append(link)
+    return need_to_visit
 
 def extract_next_links(url, resp):
     # Implementation required.
@@ -15,7 +23,37 @@ def extract_next_links(url, resp):
     #         resp.raw_response.url: the url, again
     #         resp.raw_response.content: the content of the page!
     # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
-    return list()
+
+    if resp.status != 200:
+        return []
+
+    parsed = BeautifulSoup(resp.raw_response.content, 'html.parser')
+
+    if high_textual_info(parsed) == False:
+        return []
+    
+    urls = []
+    for i in parsed.find_all('a', href = True):
+        new_url = i["href"]
+        #new_url = urljoin(new_url, href) # in case it is a relative url
+        urls.append(new_url)
+
+
+    return urls
+
+
+
+def high_textual_info(parsed):
+    min_words = 10
+    text = parsed.find('body')
+    if text is None:
+        return False
+
+    if len(text.get_text().split()) >= 50:
+        return True
+    return False
+
+
 
 def is_valid(url):
     # Decide whether to crawl this url or not. 
@@ -25,7 +63,7 @@ def is_valid(url):
         parsed = urlparse(url)
         if parsed.scheme not in set(["http", "https"]):
             return False
-        return not re.match(
+        if re.match(
             r".*\.(css|js|bmp|gif|jpe?g|ico"
             + r"|png|tiff?|mid|mp2|mp3|mp4"
             + r"|wav|avi|mov|mpeg|ram|m4v|mkv|ogg|ogv|pdf"
@@ -33,7 +71,15 @@ def is_valid(url):
             + r"|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso"
             + r"|epub|dll|cnf|tgz|sha1"
             + r"|thmx|mso|arff|rtf|jar|csv"
-            + r"|rm|smil|wmv|swf|wma|zip|rar|gz)$", parsed.path.lower())
+            + r"|rm|smil|wmv|swf|wma|zip|rar|gz)$", parsed.path.lower()):
+            return False
+        
+        requirement_domains = ["ics.uci.edu", "cs.uci.edu", "informatics.uci.edu", "stat.uci.edu", "www.ics.uci.edu",
+                                "www.cs.uci.edu", "www.informatics.uci.edu", "www.stat.uci.edu"]
+        for domains in requirement_domains:
+            if parsed.netloc.endswith(domains):
+                return True
+        return False
 
     except TypeError:
         print ("TypeError for ", parsed)
