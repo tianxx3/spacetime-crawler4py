@@ -1,16 +1,21 @@
 import re
 from urllib.parse import urlparse, urldefrag, urljoin
 from bs4 import BeautifulSoup
+from simhash import Simhash
+
+visited_url = []
+visited_links = set()
+unique_urls = 0
 
 def scraper(url, resp):
+    global unique_urls
     links = extract_next_links(url, resp)
-    visited_url = set()
     need_to_visit = []
     for link in links:
-        hashed = hash(link)
-        if hashed not in visited_url:
-            visited_url.add(hashed)
+        if is_valid(link) and hash(link) not in visited_links:
             need_to_visit.append(link)
+            visited_links.add(hash(link))
+            unique_urls += 1
     return need_to_visit
 
 def extract_next_links(url, resp):
@@ -27,6 +32,15 @@ def extract_next_links(url, resp):
     if resp.status != 200:
         return []
 
+    """
+    page_simhash = Simhash(resp.raw_response.content.decode())
+    for x in visited_url:
+        if x.distance(page_simhash) < 4:
+            return []
+    
+    visited_url.append(page_simhash)
+    """
+
     parsed = BeautifulSoup(resp.raw_response.content, 'html.parser')
 
     if high_textual_info(parsed) == False:
@@ -38,19 +52,22 @@ def extract_next_links(url, resp):
         new_url = urljoin(url, new_url) # in case it is a relative url
         new_url = urldefrag(new_url)[0]
         urls.append(new_url)
-
-
     return urls
 
 
-
 def high_textual_info(parsed):
-    min_words = 10
+    min_words = 200
     text = parsed.find('body')
     if text is None:
         return False
+    text = text.get_text()
 
-    if len(text.get_text().split()) >= 50:
+    if len(text.split()) >= min_words:   
+        page_simhash = Simhash(text)
+        for x in visited_url:
+            if x.distance(page_simhash) < 4:
+                return False
+        visited_url.append(page_simhash)
         return True
     return False
 
@@ -68,7 +85,7 @@ def is_valid(url):
             r".*\.(css|js|bmp|gif|jpe?g|ico"
             + r"|png|tiff?|mid|mp2|mp3|mp4"
             + r"|wav|avi|mov|mpeg|ram|m4v|mkv|ogg|ogv|pdf"
-            + r"|ps|eps|tex|ppt|pptx|doc|docx|xls|xlsx|names"
+            + r"|ps|eps|tex|ppt|pptx|doc|docx|xls|xlsx|names|ppsx"
             + r"|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso"
             + r"|epub|dll|cnf|tgz|sha1"
             + r"|thmx|mso|arff|rtf|jar|csv"
