@@ -17,6 +17,7 @@ class Frontier(object):
         self.config = config
         self.to_be_downloaded = list()
         self.url_pattern = defaultdict(int)
+        self.sub_domain_under_ics = defaultdict(int)
         
         if not os.path.exists(self.config.save_file) and not restart:
             # Save file does not exist, but request to load save.
@@ -62,6 +63,8 @@ class Frontier(object):
         url = normalize(url)
         urlhash = get_urlhash(url)
         if urlhash not in self.save and not self._detect_url_pattern_trap(url):
+            if urlparse(url).netloc.endswith(".ics.uci.edu"):
+                self.sub_domain_under_ics[urlparse(url).netloc] += 1
             self.save[urlhash] = (url, False)
             self.save.sync()
             self.to_be_downloaded.append(url)
@@ -79,6 +82,6 @@ class Frontier(object):
     def _detect_url_pattern_trap(self, url):
         parsed = urlparse(url)
         self.url_pattern[parsed.path] += 1
-        if self.url_pattern[parsed.path] > 10:
+        if self.url_pattern[parsed.path] > 20:
             print("detected trap: " + parsed.path)
             return True
