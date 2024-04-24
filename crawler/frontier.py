@@ -7,11 +7,16 @@ from queue import Queue, Empty
 from utils import get_logger, get_urlhash, normalize
 from scraper import is_valid
 
+from urllib.parse import urlparse
+
+from collections import defaultdict
+
 class Frontier(object):
     def __init__(self, config, restart):
         self.logger = get_logger("FRONTIER")
         self.config = config
         self.to_be_downloaded = list()
+        self.url_pattern = defaultdict(int)
         
         if not os.path.exists(self.config.save_file) and not restart:
             # Save file does not exist, but request to load save.
@@ -56,7 +61,7 @@ class Frontier(object):
     def add_url(self, url):
         url = normalize(url)
         urlhash = get_urlhash(url)
-        if urlhash not in self.save:
+        if urlhash not in self.save and not self._detect_url_pattern_trap(url):
             self.save[urlhash] = (url, False)
             self.save.sync()
             self.to_be_downloaded.append(url)
@@ -70,3 +75,10 @@ class Frontier(object):
 
         self.save[urlhash] = (url, True)
         self.save.sync()
+
+    def _detect_url_pattern_trap(self, url):
+        parsed = urlparse(url)
+        self.url_pattern[parsed.path] += 1
+        if self.url_pattern[parsed.path] > 10:
+            print("detected trap: " + parsed.path)
+            return True
