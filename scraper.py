@@ -4,8 +4,9 @@ from bs4 import BeautifulSoup
 from simhash import Simhash
 from collections import Counter
 
+MAX_DEPTH = 20
 visited_url = []
-visited_links = set()
+depth_dict = {}
 unique_urls = 0
 
 largest_page = {"url":None, "count":0}
@@ -28,18 +29,21 @@ stop_words = {
     "yourself", "yourselves"
 }
 
+def normalize(url):
+    if url.endswith("/"):
+        return url.rstrip("/")
+    return url
 
 def scraper(url, resp):
     global unique_urls
     links = extract_next_links(url, resp)
     need_to_visit = []
     for link in links:
-        if is_valid(link) and hash(link) not in visited_links and not garbage_page(link):
+        if is_valid(link):
             need_to_visit.append(link)
-            visited_links.add(hash(link))
             unique_urls += 1
     return need_to_visit
-
+"""
 def garbage_page(url):
     if not url.startswith("http://archive.ics.uci.edu") and not url.startswith("https://archive.ics.uci.edu"):
         return False
@@ -48,6 +52,7 @@ def garbage_page(url):
         return True
     
     return False
+"""
 
 def extract_next_links(url, resp):
     # Implementation required.
@@ -80,10 +85,14 @@ def extract_next_links(url, resp):
 
     urls = []
     for i in parsed.find_all('a', href = True):
-        new_url = i["href"]
+        new_url = i.get('href')
         new_url = urljoin(url, new_url) # in case it is a relative url
         new_url = urldefrag(new_url)[0]
-        urls.append(new_url)
+        new_url = normalize(new_url)
+        if new_url not in depth_dict:
+            update_depth(new_url, url)
+            if get_depth(new_url) <= MAX_DEPTH:
+                urls.append(new_url)
     return urls
 
 def most_word_page(url, parsed):
@@ -100,14 +109,21 @@ def common_words(parsed):
             if word not in stop_words:
                 word_counter.update(word)
 
+def update_depth(url, current_url):
+    depth_dict[url] = get_depth(current_url) + 1
+    print(f'Parent Depth{current_url}: {get_depth(current_url)}, new url{url}: {get_depth(current_url)}')
+
+def get_depth(url):
+    return depth_dict.get(url,0)
+
 def get_word_page():
-    print("longest page is :" + largest_page['url'])
+    print("longest page is :" + str(largest_page['url']))
 
 def get_common_word():
-    print(word_counter.most_common[50])
+    print(word_counter.most_common(50))
 
 def get_unique_urls():
-    print("total unique urls: " + unique_urls)
+    print("total unique urls: " + str(unique_urls))
 
 
 def high_textual_info(parsed):
@@ -118,11 +134,13 @@ def high_textual_info(parsed):
     text = text.get_text()
 
     if len(text.split()) >= min_words:
+        
         page_simhash = Simhash(text)
         for x in visited_url:
-            if x.distance(page_simhash) < 3:
+            if x.distance(page_simhash) < 2:
                 return False
         visited_url.append(page_simhash)
+        
         return True
     return False
 
@@ -137,8 +155,8 @@ def is_valid(url):
         if parsed.scheme not in set(["http", "https"]):
             return False
         if re.match(
-            r".*\.(css|js|bmp|gif|jpe?g|ico"
-            + r"|png|tiff?|mid|mp2|mp3|mp4"
+            r".*\.(css|js|bmp|gif|jpe?g|ico|img"
+            + r"|png|tiff?|mid|mp2|mp3|mp4|apk|odc|apk|war"
             + r"|wav|avi|mov|mpeg|ram|m4v|mkv|ogg|ogv|pdf"
             + r"|ps|eps|tex|ppt|pptx|doc|docx|xls|xlsx|names|ppsx"
             + r"|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso"

@@ -5,7 +5,7 @@ from threading import Thread, RLock
 from queue import Queue, Empty
 
 from utils import get_logger, get_urlhash, normalize
-from scraper import is_valid
+from scraper import is_valid, get_depth
 
 from urllib.parse import urlparse
 
@@ -65,6 +65,7 @@ class Frontier(object):
         if urlhash not in self.save and not self._detect_url_pattern_trap(url):
             if urlparse(url).netloc.endswith(".ics.uci.edu"):
                 self.sub_domain_under_ics[urlparse(url).netloc] += 1
+            self.logger.info(f'{url} + {get_depth(url)}')
             self.save[urlhash] = (url, False)
             self.save.sync()
             self.to_be_downloaded.append(url)
@@ -81,7 +82,10 @@ class Frontier(object):
 
     def _detect_url_pattern_trap(self, url):
         parsed = urlparse(url)
-        self.url_pattern[parsed.path] += 1
-        if self.url_pattern[parsed.path] > 20:
-            print("detected trap: " + parsed.path)
+        x = f"{parsed.netloc}{parsed.path}"
+        self.url_pattern[x] += 1
+        if self.url_pattern[x] > 20:
+            print("detected trap: " + x)
+            #print(self.url_pattern[x])
             return True
+        return False
