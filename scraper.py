@@ -3,11 +3,11 @@ from urllib.parse import urlparse, urldefrag, urljoin
 from bs4 import BeautifulSoup
 from simhash import Simhash
 from collections import Counter
+from lxml import html
 
-MAX_DEPTH = 20
+MAX_DEPTH = 40
 visited_url = []
 depth_dict = {}
-unique_urls = 0
 
 largest_page = {"url":None, "count":0}
 word_counter = Counter()
@@ -41,18 +41,7 @@ def scraper(url, resp):
     for link in links:
         if is_valid(link):
             need_to_visit.append(link)
-            unique_urls += 1
     return need_to_visit
-"""
-def garbage_page(url):
-    if not url.startswith("http://archive.ics.uci.edu") and not url.startswith("https://archive.ics.uci.edu"):
-        return False
-    
-    if url.endswith("view=table") or url.endswith("view=list"):
-        return True
-    
-    return False
-"""
 
 def extract_next_links(url, resp):
     # Implementation required.
@@ -66,16 +55,25 @@ def extract_next_links(url, resp):
     # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
 
     if resp.status != 200:
-        if resp.status in [301, 302]:
-            redirect_url = resp.header['Location']
+        if resp.status in [301, 302, 307, 309]:
+            redirect_url = resp.headers['Location']
             redirect_url = urljoin(url, redirect_url)
-            return [redirect_url]
+            redirect_url = urldefrag(redirect_url)[0]
+            redirect_url = normalize(redirect_url)
+            if redirect_url not in depth_dict:
+                update_depth(redirect_url, url)
+                if get_depth(redirect_url) <= MAX_DEPTH:
+                    return [redirect_url]
+                else:
+                    return []
+            else:
+                return []
         return []
 
-    if len(resp.raw_response.content) > 1 * 1024 * 1024:
+    if len(resp.raw_response.content) > 10 * 1024 * 1024:
         return []
 
-    parsed = BeautifulSoup(resp.raw_response.content, 'html.parser')
+    parsed = BeautifulSoup(resp.raw_response.content, 'lxml')
 
     if high_textual_info(parsed) == False:
         return []
@@ -104,43 +102,41 @@ def most_word_page(url, parsed):
 def common_words(parsed):
     text = parsed.find('body').get_text()
     if isinstance(text, str):
-        text = re.findall(r'\b\w{2,}\b', text.lower())
+        text = re.findall(r'\b[a-zA-Z]{2,}\b', text.lower())
         for word in text:
             if word not in stop_words:
-                word_counter.update(word)
+                word_counter.update([word])
+                
 
 def update_depth(url, current_url):
     depth_dict[url] = get_depth(current_url) + 1
-    print(f'Parent Depth{current_url}: {get_depth(current_url)}, new url{url}: {get_depth(current_url)}')
+    #print(f'Parent Depth{current_url}: {get_depth(current_url)}, new url{url}: {get_depth(url)}')
 
 def get_depth(url):
     return depth_dict.get(url,0)
 
 def get_word_page():
-    print("longest page is :" + str(largest_page['url']))
+    return f'longest page is: {str(largest_page["url"])}'
+    #print("longest page is :" + str(largest_page['url']))
 
 def get_common_word():
-    print(word_counter.most_common(50))
-
-def get_unique_urls():
-    print("total unique urls: " + str(unique_urls))
+    return word_counter.most_common(50)
+    #print(word_counter.most_common(50))
 
 
 def high_textual_info(parsed):
-    min_words = 200
+    min_words = 150
     text = parsed.find('body')
     if text is None:
         return False
     text = text.get_text()
 
     if len(text.split()) >= min_words:
-        
         page_simhash = Simhash(text)
         for x in visited_url:
-            if x.distance(page_simhash) < 2:
+            if x.distance(page_simhash) <= 1:
                 return False
         visited_url.append(page_simhash)
-        
         return True
     return False
 
@@ -156,7 +152,7 @@ def is_valid(url):
             return False
         if re.match(
             r".*\.(css|js|bmp|gif|jpe?g|ico|img"
-            + r"|png|tiff?|mid|mp2|mp3|mp4|apk|odc|apk|war"
+            + r"|png|tiff?|mid|mp2|mp3|mp4|apk|odc|apk|war|zip"
             + r"|wav|avi|mov|mpeg|ram|m4v|mkv|ogg|ogv|pdf"
             + r"|ps|eps|tex|ppt|pptx|doc|docx|xls|xlsx|names|ppsx"
             + r"|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso"
@@ -165,8 +161,7 @@ def is_valid(url):
             + r"|rm|smil|wmv|swf|wma|zip|rar|gz)$", parsed.path.lower()):
             return False
         
-        requirement_domains = [".ics.uci.edu", ".cs.uci.edu", ".informatics.uci.edu", ".stat.uci.edu", "www.ics.uci.edu",
-                                "www.cs.uci.edu", "www.informatics.uci.edu", "www.stat.uci.edu"]
+        requirement_domains = [".ics.uci.edu", ".cs.uci.edu", ".informatics.uci.edu", ".stat.uci.edu"]
         #if parsed.netloc in requirement_domains:
             #return True
             

@@ -22,7 +22,9 @@ class Worker(Thread):
             tbd_url = self.frontier.get_tbd_url()
             if not tbd_url:
                 self.logger.info("Frontier is empty. Stopping Crawler.")
-                scraper.get_unique_urls()
+                self.logger.info(f"{self.frontier.get_unique_urls()} unique urls")
+                self.logger.info(scraper.get_common_word())
+                self.logger.info(scraper.get_word_page())
                 scraper.get_common_word()
                 scraper.get_word_page()
                 break
