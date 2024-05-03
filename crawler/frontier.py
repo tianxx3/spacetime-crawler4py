@@ -67,13 +67,16 @@ class Frontier(object):
             if urlparse(url).netloc.endswith(".ics.uci.edu"):
                 self.sub_domain_under_ics[urlparse(url).netloc] += 1
             self.unique_urls += 1
-            self.logger.info(f'{url} + {get_depth(url)}')
+            #self.logger.info(f'{url} + {get_depth(url)}')
             self.save[urlhash] = (url, False)
             self.save.sync()
             self.to_be_downloaded.append(url)
     
     def get_unique_urls(self):
         return self.unique_urls
+    
+    def get_sub_domain_under_ics(self):
+        return self.sub_domain_under_ics
 
     def mark_url_complete(self, url):
         urlhash = get_urlhash(url)

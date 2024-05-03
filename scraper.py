@@ -5,7 +5,7 @@ from simhash import Simhash
 from collections import Counter
 from lxml import html
 
-MAX_DEPTH = 40
+MAX_DEPTH = 50
 visited_url = []
 depth_dict = {}
 
@@ -35,7 +35,6 @@ def normalize(url):
     return url
 
 def scraper(url, resp):
-    global unique_urls
     links = extract_next_links(url, resp)
     need_to_visit = []
     for link in links:
@@ -168,7 +167,6 @@ def is_valid(url):
         for domains in requirement_domains:
             if parsed.netloc.endswith(domains):
                 return True
-            
         return False
 
     except TypeError:

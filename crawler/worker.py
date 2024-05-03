@@ -25,6 +25,7 @@ class Worker(Thread):
                 self.logger.info(f"{self.frontier.get_unique_urls()} unique urls")
                 self.logger.info(scraper.get_common_word())
                 self.logger.info(scraper.get_word_page())
+                self.logger.info(f"Domains under ICS: {self.frontier.get_sub_domain_under_ics()}")
                 scraper.get_common_word()
                 scraper.get_word_page()
                 break
